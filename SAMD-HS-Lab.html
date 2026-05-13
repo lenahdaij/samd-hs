@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAMD-HS – AI-Powered Mobile Laboratory</title>
+
+<!-- Google Fonts: Orbitron for futuristic headers, Rajdhani for body -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+<!-- Three.js from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+/* ============================================
+   CSS VARIABLES & RESET
+   ============================================ */
+:root {
+  --navy:       #020b18;
+  --navy2:      #041225;
+  --panel:      #071e33cc;
+  --cyan:       #00e5ff;
+  --cyan2:      #00bcd4;
+  --cyan-glow:  #00e5ff55;
+  --cyan-dim:   #00e5ff22;
+  --orange:     #ff6d00;
+  --green:      #00ff88;
+  --white:      #e8f4fd;
+  --gray:       #7ea8c4;
+  --border:     #00e5ff33;
+  --metal:      #1a3a52;
+  --font-head:  'Orbitron', monospace;
+  --font-body:  'Rajdhani', sans-serif;
+  --font-mono:  'Share Tech Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--navy);
+  color: var(--white);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+/* ============================================
+   BACKGROUND GRID & ATMOSPHERE
+   ============================================ */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 30% 40%, #00e5ff0a 0%, transparent 60%),
+    radial-gradient(ellipse 60% 80% at 80% 60%, #0040600d 0%, transparent 50%),
+    linear-gradient(180deg, #020b18 0%, #041225 50%, #020b18 100%);
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 60px 60px;
+  opacity: 0.3;
+  pointer-events: none; z-index: 0;
+}
+
+/* ============================================
+   LAYOUT
+   ============================================ */
+#app {
+  position: relative; z-index: 1;
+  width: 100vw; height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* TOP HEADER BAR */
+#header {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--panel) 0%, transparent 100%);
+  backdrop-filter: blur(12px);
+}
+
+.header-brand {
+  display: flex; align-items: center; gap: 14px;
+}
+
+.brand-logo {
+  width: 44px; height: 44px;
+  border: 2px solid var(--cyan);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head);
+  font-size: 11px; font-weight: 900;
+  color: var(--cyan);
+  box-shadow: 0 0 16px var(--cyan-glow), inset 0 0 10px var(--cyan-dim);
+  letter-spacing: 0.5px;
+  animation: pulse-brand 3s infinite;
+}
+@keyframes pulse-brand {
+  0%,100% { box-shadow: 0 0 16px var(--cyan-glow), inset 0 0 10px var(--cyan-dim); }
+  50%      { box-shadow: 0 0 28px #00e5ff88, inset 0 0 18px #00e5ff44; }
+}
+
+.brand-text h1 {
+  font-family: var(--font-head);
+  font-size: 18px; font-weight: 900;
+  color: var(--cyan);
+  letter-spacing: 3px;
+  text-shadow: 0 0 20px var(--cyan-glow);
+}
+.brand-text p {
+  font-size: 11px; color: var(--gray);
+  letter-spacing: 2px; text-transform: uppercase;
+}
+
+.header-status {
+  display: flex; gap: 20px; align-items: center;
+}
+.status-item {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--gray);
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ============================================
+   MAIN CONTENT
+   ============================================ */
+#main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 3D CANVAS AREA */
+#canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#canvas-3d {
+  width: 100%; height: 100%;
+  display: block;
+  cursor: grab;
+}
+#canvas-3d:active { cursor: grabbing; }
+
+/* CORNER DECORATIONS */
+.corner {
+  position: absolute;
+  width: 24px; height: 24px;
+  pointer-events: none;
+}
+.corner-tl { top:12px; left:12px; border-top:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+.corner-tr { top:12px; right:12px; border-top:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+.corner-bl { bottom:12px; left:12px; border-bottom:2px solid var(--cyan); border-left:2px solid var(--cyan); }
+.corner-br { bottom:12px; right:12px; border-bottom:2px solid var(--cyan); border-right:2px solid var(--cyan); }
+
+/* CROSSHAIR CENTER */
+.crosshair {
+  position: absolute; top:50%; left:50%;
+  transform: translate(-50%,-50%);
+  pointer-events: none; opacity: 0.15;
+}
+.crosshair::before, .crosshair::after {
+  content:''; position:absolute; background:var(--cyan);
+}
+.crosshair::before { width:40px;height:1px;top:0;left:-20px; }
+.crosshair::after  { width:1px;height:40px;top:-20px;left:0; }
+
+/* SCAN LINE EFFECT */
+@keyframes scan { 0%{top:-5%} 100%{top:105%} }
+.scanline {
+  position:absolute; left:0; right:0; height:2px;
+  background: linear-gradient(90deg,transparent,var(--cyan-glow),transparent);
+  animation: scan 4s linear infinite;
+  pointer-events:none;
+}
+
+/* FLOATING LABELS ON CANVAS */
+.canvas-label {
+  position: absolute;
+  pointer-events: none;
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--cyan);
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.canvas-label.visible { opacity: 1; }
+.canvas-label .label-line {
+  height: 1px; background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+}
+.canvas-label .label-text {
+  background: var(--panel);
+  border: 1px solid var(--cyan);
+  padding: 3px 8px;
+  border-radius: 3px;
+  box-shadow: 0 0 10px var(--cyan-dim);
+  white-space: nowrap;
+}
+
+/* CONTROL BUTTONS */
+#controls {
+  position: absolute;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 10px;
+}
+
+.btn {
+  font-family: var(--font-head);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 1.5px;
+  padding: 10px 18px;
+  border: 1px solid var(--cyan);
+  background: var(--panel);
+  color: var(--cyan);
+  cursor: pointer;
+  border-radius: 4px;
+  backdrop-filter: blur(10px);
+  transition: all 0.2s;
+  text-transform: uppercase;
+  box-shadow: 0 0 12px var(--cyan-dim);
+}
+.btn:hover {
+  background: var(--cyan);
+  color: var(--navy);
+  box-shadow: 0 0 24px var(--cyan-glow);
+}
+.btn:active { transform: scale(0.97); }
+.btn.active {
+  background: var(--cyan);
+  color: var(--navy);
+}
+
+/* ZOOM HINT */
+.hint {
+  position: absolute;
+  top: 16px; left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--gray);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 5px 14px; border-radius: 20px;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+/* ============================================
+   RIGHT INFO PANEL
+   ============================================ */
+#info-panel {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--panel) 0%, #020b18cc 100%);
+  backdrop-filter: blur(16px);
+  overflow-y: auto;
+  display: flex; flex-direction: column;
+  padding: 20px 18px;
+  gap: 16px;
+}
+#info-panel::-webkit-scrollbar { width: 4px; }
+#info-panel::-webkit-scrollbar-track { background: transparent; }
+#info-panel::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
+
+.panel-section {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+  background: #00e5ff06;
+  position: relative;
+  overflow: hidden;
+}
+.panel-section::before {
+  content:'';
+  position:absolute; top:0;left:0; right:0; height:2px;
+  background: linear-gradient(90deg, var(--cyan), transparent);
+}
+
+.section-tag {
+  font-family: var(--font-mono);
+  font-size: 9px; color: var(--cyan);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  opacity: 0.7;
+}
+
+.section-title {
+  font-family: var(--font-head);
+  font-size: 15px; font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 2px;
+  text-shadow: 0 0 16px var(--cyan-glow);
+  line-height: 1.3;
+  margin-bottom: 8px;
+}
+
+.section-desc {
+  font-size: 12px; line-height: 1.7;
+  color: var(--gray);
+}
+
+/* CARTRIDGE GRID */
+.cartridge-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px; margin-top: 10px;
+}
+.cart-item {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px 8px;
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--white);
+  background: #00e5ff08;
+  transition: all 0.2s;
+  cursor: default;
+}
+.cart-item:hover {
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+  box-shadow: 0 0 10px var(--cyan-dim);
+}
+.cart-dot {
+  width: 8px; height: 8px; border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* FEATURE LIST */
+.feature-list {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 7px;
+  margin-top: 8px;
+}
+.feature-list li {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12px; color: var(--gray);
+  line-height: 1.4;
+}
+.feature-list li::before {
+  content: '▸';
+  color: var(--cyan);
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 10px;
+}
+
+/* USE CASE BADGES */
+.use-cases {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
+.use-badge {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--cyan); letter-spacing: 1px;
+  border: 1px solid var(--cyan);
+  padding: 4px 8px; border-radius: 20px;
+  background: var(--cyan-dim);
+  box-shadow: 0 0 8px var(--cyan-dim);
+}
+
+/* STATS ROW */
+.stats-row {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px; margin-top: 10px;
+}
+.stat-box {
+  border: 1px solid var(--border);
+  border-radius: 4px; padding: 10px 6px;
+  text-align: center;
+  background: #00e5ff06;
+}
+.stat-val {
+  font-family: var(--font-head); font-size: 16px;
+  font-weight: 900; color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan-glow);
+}
+.stat-label {
+  font-family: var(--font-mono); font-size: 8px;
+  color: var(--gray); letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+/* PROGRESS BARS */
+.prog-list { display: flex; flex-direction: column; gap: 9px; margin-top: 10px; }
+.prog-item label {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--gray); margin-bottom: 4px;
+}
+.prog-item label span { color: var(--cyan); }
+.prog-bar {
+  height: 4px; background: var(--metal);
+  border-radius: 2px; overflow: hidden;
+}
+.prog-fill {
+  height: 100%; border-radius: 2px;
+  background: linear-gradient(90deg, var(--cyan2), var(--cyan));
+  box-shadow: 0 0 8px var(--cyan-glow);
+  position: relative;
+  animation: prog-anim 1.5s ease-out forwards;
+}
+@keyframes prog-anim { from { width: 0 !important; } }
+
+/* BOTTOM STATUS BAR */
+#statusbar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  padding: 6px 24px;
+  display: flex; align-items: center; gap: 24px;
+}
+.sb-item {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--gray);
+  display: flex; align-items: center; gap: 6px;
+}
+.sb-item span { color: var(--cyan); }
+
+/* LOADING SCREEN */
+#loader {
+  position:fixed; inset:0; z-index:999;
+  background: var(--navy);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:20px;
+  transition: opacity 0.8s;
+}
+#loader.hide { opacity:0; pointer-events:none; }
+.loader-logo {
+  font-family: var(--font-head); font-size:36px; font-weight:900;
+  color:var(--cyan); letter-spacing:6px;
+  text-shadow:0 0 40px var(--cyan-glow);
+  animation: pulse-brand 1.5s infinite;
+}
+.loader-sub { font-family:var(--font-mono); font-size:12px; color:var(--gray); letter-spacing:3px; }
+.loader-bar { width:260px; height:2px; background:var(--metal); border-radius:1px; overflow:hidden; }
+.loader-fill {
+  height:100%; width:0; background:var(--cyan);
+  box-shadow:0 0 10px var(--cyan);
+  animation: load 1.8s ease-out forwards;
+}
+@keyframes load { to{width:100%} }
+.loader-pct { font-family:var(--font-mono); font-size:11px; color:var(--cyan); }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     LOADING SCREEN
+     ============================================================ -->
+<div id="loader">
+  <div class="loader-logo">SAMD-HS</div>
+  <div class="loader-sub">Initializing AI Medical System...</div>
+  <div class="loader-bar"><div class="loader-fill"></div></div>
+  <div class="loader-pct" id="loader-pct">0%</div>
+</div>
+
+<!-- ============================================================
+     MAIN APP
+     ============================================================ -->
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="header-brand">
+      <div class="brand-logo">SAMD</div>
+      <div class="brand-text">
+        <h1>SAMD-HS</h1>
+        <p>AI-Powered Mobile Laboratory</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-item"><div class="status-dot"></div>System Online</div>
+      <div class="status-item"><div class="status-dot" style="background:#00aaff;box-shadow:0 0 8px #00aaff"></div>AI Engine Ready</div>
+      <div class="status-item"><div class="status-dot" style="background:var(--orange);box-shadow:0 0 8px var(--orange)"></div>Solar Charging</div>
+      <div class="status-item" style="font-family:var(--font-mono);font-size:11px;color:var(--cyan);" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- 3D CANVAS -->
+    <div id="canvas-wrap">
+      <canvas id="canvas-3d"></canvas>
+
+      <!-- Atmospheric scanline -->
+      <div class="scanline"></div>
+
+      <!-- Corner brackets -->
+      <div class="corner corner-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner corner-br"></div>
+
+      <!-- Crosshair -->
+      <div class="crosshair"></div>
+
+      <!-- Hint -->
+      <div class="hint">🖱 Drag to Rotate · Scroll to Zoom · Right-drag to Pan</div>
+
+      <!-- Floating HTML labels (positioned by JS) -->
+      <div class="canvas-label" id="lbl-solar"   style="top:20%;left:15%">
+        <div class="label-text">☀ Solar Panel</div>
+        <div class="label-line" style="width:60px"></div>
+      </div>
+      <div class="canvas-label" id="lbl-screen"  style="top:35%;left:12%">
+        <div class="label-text">⬛ AI Touchscreen</div>
+        <div class="label-line" style="width:50px"></div>
+      </div>
+      <div class="canvas-label" id="lbl-cart"    style="bottom:38%;left:14%">
+        <div class="label-text">◉ Cartridge Modules</div>
+        <div class="label-line" style="width:55px"></div>
+      </div>
+      <div class="canvas-label" id="lbl-tubes"   style="bottom:25%;right:14%">
+        <div class="label-line" style="width:50px"></div>
+        <div class="label-text">⬡ Sample Tube Rack</div>
+      </div>
+      <div class="canvas-label" id="lbl-hepa"    style="top:28%;right:12%">
+        <div class="label-line" style="width:45px"></div>
+        <div class="label-text">◈ HEPA Air Filter</div>
+      </div>
+      <div class="canvas-label" id="lbl-battery" style="bottom:18%;right:14%">
+        <div class="label-line" style="width:45px"></div>
+        <div class="label-text">⚡ Battery &amp; Ports</div>
+      </div>
+
+      <!-- CONTROL BUTTONS -->
+      <div id="controls">
+        <button class="btn active" id="btn-rotate" onclick="toggleRotate()">⟳ Auto Rotate</button>
+        <button class="btn" id="btn-explode" onclick="toggleExplode()">💥 Explode View</button>
+        <button class="btn" onclick="resetView()">↺ Reset View</button>
+        <button class="btn" id="btn-labels" onclick="toggleLabels()">🏷 Labels</button>
+      </div>
+    </div>
+
+    <!-- INFO PANEL -->
+    <aside id="info-panel">
+
+      <!-- Innovation Name -->
+      <div class="panel-section">
+        <div class="section-tag">▸ Innovation ID · SAMD-HS v2.0</div>
+        <div class="section-title">AI-Powered<br>Mobile Laboratory</div>
+        <div class="section-desc">
+          A fully autonomous, field-deployable diagnostic platform integrating AI-driven analysis, modular test cartridges, solar power, and cloud connectivity — delivering hospital-grade diagnostics anywhere on Earth.
+        </div>
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-val">14</div><div class="stat-label">Test Types</div></div>
+          <div class="stat-box"><div class="stat-val">45s</div><div class="stat-label">Result Time</div></div>
+          <div class="stat-box"><div class="stat-val">99.2%</div><div class="stat-label">Accuracy</div></div>
+        </div>
+      </div>
+
+      <!-- Cartridge Modules -->
+      <div class="panel-section">
+        <div class="section-tag">▸ Diagnostic Cartridges</div>
+        <div class="cartridge-grid">
+          <div class="cart-item"><div class="cart-dot" style="background:#ff6d00"></div>CBC Panel</div>
+          <div class="cart-item"><div class="cart-dot" style="background:#00e5ff"></div>Chemistry</div>
+          <div class="cart-item"><div class="cart-dot" style="background:#ff1744"></div>Cardiac</div>
+          <div class="cart-item"><div class="cart-dot" style="background:#00ff88"></div>Infection</div>
+          <div class="cart-item"><div class="cart-dot" style="background:#aa00ff"></div>Coagulation</div>
+          <div class="cart-item"><div class="cart-dot" style="background:#ffea00"></div>PCR Panel</div>
+        </div>
+      </div>
+
+      <!-- Key Features -->
+      <div class="panel-section">
+        <div class="section-tag">▸ Key Features</div>
+        <ul class="feature-list">
+          <li>On-device AI diagnostics with cloud sync</li>
+          <li>Solar + battery dual charging system</li>
+          <li>HEPA filtration + UV-C disinfection chamber</li>
+          <li>Encrypted results transmission (4G/5G/Sat)</li>
+          <li>72-hr autonomous battery operation</li>
+          <li>IP67 dust & water resistant housing</li>
+          <li>Operates -20°C to +55°C environments</li>
+          <li>Single-operator deployment in &lt;5 minutes</li>
+        </ul>
+      </div>
+
+      <!-- Performance -->
+      <div class="panel-section">
+        <div class="section-tag">▸ System Performance</div>
+        <div class="prog-list">
+          <div class="prog-item">
+            <label>Diagnostic Speed <span>98%</span></label>
+            <div class="prog-bar"><div class="prog-fill" style="width:98%"></div></div>
+          </div>
+          <div class="prog-item">
+            <label>AI Accuracy <span>99.2%</span></label>
+            <div class="prog-bar"><div class="prog-fill" style="width:99%"></div></div>
+          </div>
+          <div class="prog-item">
+            <label>Power Efficiency <span>91%</span></label>
+            <div class="prog-bar"><div class="prog-fill" style="width:91%"></div></div>
+          </div>
+          <div class="prog-item">
+            <label>Connectivity <span>87%</span></label>
+            <div class="prog-bar"><div class="prog-fill" style="width:87%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Use Cases -->
+      <div class="panel-section">
+        <div class="section-tag">▸ Deployment Scenarios</div>
+        <div class="use-cases">
+          <span class="use-badge">Emergency Response</span>
+          <span class="use-badge">Remote Areas</span>
+          <span class="use-badge">Military Field</span>
+          <span class="use-badge">Disaster Relief</span>
+          <span class="use-badge">Rural Clinics</span>
+          <span class="use-badge">Pandemic Control</span>
+          <span class="use-badge">Air/Sea Rescue</span>
+          <span class="use-badge">Research Ops</span>
+        </div>
+      </div>
+
+    </aside>
+  </div><!-- end #main -->
+
+  <!-- STATUS BAR -->
+  <div id="statusbar">
+    <div class="sb-item">MODEL: <span>SAMD-HS REV 2.0</span></div>
+    <div class="sb-item">RENDER: <span>WebGL 2.0 · Three.js</span></div>
+    <div class="sb-item">POLY: <span id="poly-count">–</span></div>
+    <div class="sb-item">CAM: <span id="cam-info">Perspective</span></div>
+    <div class="sb-item" style="margin-left:auto">⬡ &nbsp;<span style="color:var(--orange)">HACKATHON PROTOTYPE</span></div>
+  </div>
+
+</div><!-- end #app -->
+
+<!-- ============================================================
+     THREE.JS 3D ENGINE
+     ============================================================ -->
+<script>
+/* ============================================================
+   SCENE SETUP
+   ============================================================ */
+const canvas = document.getElementById('canvas-3d');
+const wrap   = document.getElementById('canvas-wrap');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.4;
+renderer.outputEncoding    = THREE.sRGBEncoding;
+
+const scene  = new THREE.Scene();
+scene.background = null; // transparent – CSS handles bg
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 200);
+camera.position.set(3.8, 2.8, 4.2);
+
+function resizeRenderer() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+resizeRenderer();
+new ResizeObserver(resizeRenderer).observe(wrap);
+
+/* ============================================================
+   ORBIT CONTROLS (inline – THREE r128 compatible)
+   ============================================================ */
+// Lightweight OrbitControls reimplementation since cdnjs version isn't separate
+class OrbitControls {
+  constructor(cam, dom) {
+    this.cam = cam; this.dom = dom;
+    this.target = new THREE.Vector3();
+    this.minDist = 2; this.maxDist = 14;
+    this.damping = 0.08;
+    this._sph    = new THREE.Spherical().setFromVector3(cam.position.clone().sub(this.target));
+    this._spDelta= new THREE.Spherical();
+    this._panDelta= new THREE.Vector3();
+    this._scale  = 1;
+    this._dragging=false; this._rightDrag=false;
+    this._prev   = {x:0,y:0};
+    this._addListeners();
+  }
+  _addListeners() {
+    this.dom.addEventListener('mousedown',  e=>this._onDown(e));
+    window.addEventListener('mousemove',    e=>this._onMove(e));
+    window.addEventListener('mouseup',      ()=>{ this._dragging=false; this._rightDrag=false; });
+    this.dom.addEventListener('wheel',      e=>this._onWheel(e), {passive:false});
+    this.dom.addEventListener('touchstart', e=>this._onTouch(e), {passive:false});
+    this.dom.addEventListener('touchmove',  e=>this._onTouchMove(e), {passive:false});
+    this.dom.addEventListener('contextmenu',e=>e.preventDefault());
+  }
+  _onDown(e) {
+    this._prev={x:e.clientX,y:e.clientY};
+    if(e.button===2){ this._rightDrag=true; } else { this._dragging=true; }
+  }
+  _onMove(e) {
+    const dx=e.clientX-this._prev.x, dy=e.clientY-this._prev.y;
+    this._prev={x:e.clientX,y:e.clientY};
+    if(this._dragging){ this._spDelta.theta-=dx*0.005; this._spDelta.phi-=dy*0.005; }
+    if(this._rightDrag){
+      const s=this._sph.radius*0.001;
+      const right=new THREE.Vector3(); right.crossVectors(this.cam.getWorldDirection(new THREE.Vector3()), this.cam.up).normalize();
+      const up=this.cam.up.clone().normalize();
+      this._panDelta.addScaledVector(right,-dx*s).addScaledVector(up,dy*s);
+    }
+  }
+  _onWheel(e){ e.preventDefault(); this._scale *= (e.deltaY>0)?1.12:0.88; }
+  _onTouch(e){ if(e.touches.length===1) this._prev={x:e.touches[0].clientX,y:e.touches[0].clientY}; this._dragging=true; }
+  _onTouchMove(e){ e.preventDefault();
+    if(e.touches.length===1) this._onMove({clientX:e.touches[0].clientX,clientY:e.touches[0].clientY}); }
+  update() {
+    const s=this._sph;
+    s.theta += this._spDelta.theta*this.damping;
+    s.phi   += this._spDelta.phi  *this.damping;
+    s.phi    = Math.max(0.1, Math.min(Math.PI-0.1, s.phi));
+    this._spDelta.theta *= (1-this.damping);
+    this._spDelta.phi   *= (1-this.damping);
+    s.radius *= 1+(this._scale-1)*this.damping;
+    s.radius  = Math.max(this.minDist, Math.min(this.maxDist, s.radius));
+    this._scale = 1+(this._scale-1)*(1-this.damping);
+    this.target.addScaledVector(this._panDelta, this.damping);
+    this._panDelta.multiplyScalar(1-this.damping);
+    const pos=new THREE.Vector3().setFromSpherical(s);
+    this.cam.position.copy(pos.add(this.target));
+    this.cam.lookAt(this.target);
+  }
+}
+const controls = new OrbitControls(camera, canvas);
+controls.target.set(0, 0.3, 0);
+
+/* ============================================================
+   LIGHTS
+   ============================================================ */
+// Ambient
+const ambient = new THREE.AmbientLight(0x112233, 0.6);
+scene.add(ambient);
+
+// Key light (white-ish from top-left)
+const keyLight = new THREE.DirectionalLight(0xd0eeff, 1.8);
+keyLight.position.set(5, 8, 5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048,2048);
+keyLight.shadow.camera.near=0.5; keyLight.shadow.camera.far=30;
+keyLight.shadow.camera.left=-5; keyLight.shadow.camera.right=5;
+keyLight.shadow.camera.top=5;  keyLight.shadow.camera.bottom=-5;
+scene.add(keyLight);
+
+// Fill light (cyan tint from right)
+const fillLight = new THREE.DirectionalLight(0x00e5ff, 0.5);
+fillLight.position.set(-6, 3, 2);
+scene.add(fillLight);
+
+// Rim light (bottom rear)
+const rimLight = new THREE.DirectionalLight(0x0044aa, 0.4);
+rimLight.position.set(0, -4, -6);
+scene.add(rimLight);
+
+// Cyan point light (under model, glowing floor)
+const glow1 = new THREE.PointLight(0x00e5ff, 1.2, 6);
+glow1.position.set(0, -0.8, 0);
+scene.add(glow1);
+
+// Screen glow
+const glow2 = new THREE.PointLight(0x00e5ff, 0.8, 3);
+glow2.position.set(0, 0.6, 0.3);
+scene.add(glow2);
+
+/* ============================================================
+   MATERIALS LIBRARY
+   ============================================================ */
+// Hard case shell – dark navy metallic
+const matShell = new THREE.MeshStandardMaterial({
+  color: 0x0a1e30, metalness: 0.7, roughness: 0.25,
+  envMapIntensity: 1.2,
+});
+// Rubber trim
+const matRubber = new THREE.MeshStandardMaterial({
+  color: 0x080f18, metalness: 0.0, roughness: 0.95,
+});
+// Metal accents (latches, hinges)
+const matMetal = new THREE.MeshStandardMaterial({
+  color: 0x8090a0, metalness: 0.95, roughness: 0.1,
+});
+// Cyan glowing material
+const matCyan = new THREE.MeshStandardMaterial({
+  color: 0x00e5ff, emissive: 0x00b0cc, emissiveIntensity: 1.5,
+  metalness: 0.3, roughness: 0.2,
+});
+// Screen (dark with blue glow)
+const matScreen = new THREE.MeshStandardMaterial({
+  color: 0x001a2e, emissive: 0x004466, emissiveIntensity: 1.8,
+  metalness: 0.1, roughness: 0.05,
+});
+// Solar panel
+const matSolar = new THREE.MeshStandardMaterial({
+  color: 0x0a1535, metalness: 0.5, roughness: 0.15,
+  emissive: 0x001122, emissiveIntensity: 0.5,
+});
+// Solar cell lines
+const matSolarLine = new THREE.MeshStandardMaterial({
+  color: 0x00aaff, emissive: 0x004488, emissiveIntensity: 0.8,
+  metalness: 0.2, roughness: 0.3,
+});
+// Vent grille
+const matVent = new THREE.MeshStandardMaterial({
+  color: 0x050d14, metalness: 0.6, roughness: 0.4,
+});
+// White handle
+const matHandle = new THREE.MeshStandardMaterial({
+  color: 0xc8d8e8, metalness: 0.4, roughness: 0.3,
+});
+// Inner foam
+const matFoam = new THREE.MeshStandardMaterial({
+  color: 0x071520, metalness: 0, roughness: 0.9,
+});
+// Cartridge colors
+const cartColors = [0xff6d00, 0x00e5ff, 0xff1744, 0x00ff88, 0xaa00ff, 0xffea00];
+const cartMats   = cartColors.map(c => new THREE.MeshStandardMaterial({
+  color: c, emissive: c, emissiveIntensity: 0.4, metalness: 0.3, roughness: 0.4,
+}));
+// Tube (glass-like)
+const matTube = new THREE.MeshStandardMaterial({
+  color: 0x88ccff, metalness: 0.1, roughness: 0.05,
+  transparent: true, opacity: 0.7,
+});
+// Port metal
+const matPort = new THREE.MeshStandardMaterial({
+  color: 0x3a5060, metalness: 0.9, roughness: 0.15,
+});
+// UV-C purple
+const matUVC = new THREE.MeshStandardMaterial({
+  color: 0x6600cc, emissive: 0x330066, emissiveIntensity: 1.2,
+  metalness: 0.2, roughness: 0.4,
+});
+
+/* ============================================================
+   HELPER: rounded box
+   ============================================================ */
+function roundedBox(w,h,d,r,segs=3) {
+  // Use BoxGeometry with bevel approximation via scaling
+  // For simplicity use CylinderGeometry-capped box or plain box
+  return new THREE.BoxGeometry(w,h,d, segs,segs,segs);
+}
+
+/* ============================================================
+   SUITCASE MODEL
+   ============================================================ */
+const suitcase = new THREE.Group();
+scene.add(suitcase);
+
+// ---- BASE BOX ----
+const baseGeo = new THREE.BoxGeometry(3.2, 1.0, 2.0, 2,2,2);
+const baseMesh= new THREE.Mesh(baseGeo, matShell);
+baseMesh.position.y = 0;
+baseMesh.castShadow = true; baseMesh.receiveShadow = true;
+suitcase.add(baseMesh);
+
+// Base bottom beveled edges (rubber feet)
+for(let [x,z] of [[-1.4,-0.85],[1.4,-0.85],[-1.4,0.85],[1.4,0.85]]) {
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.09,0.06,12), matRubber);
+  foot.position.set(x,-0.53,z); suitcase.add(foot);
+}
+
+// Base rubber trim strip (around perimeter)
+const trimGeo = new THREE.BoxGeometry(3.3,0.06,2.1);
+const trim1 = new THREE.Mesh(trimGeo, matRubber);
+trim1.position.y = 0.02; suitcase.add(trim1);
+
+// ---- LID (open ~55 degrees) ----
+const lidPivot = new THREE.Group();
+lidPivot.position.set(0, 0.52, -1.0); // rear hinge
+suitcase.add(lidPivot);
+
+const lidMesh = new THREE.Mesh(new THREE.BoxGeometry(3.2,0.18,2.0,2,1,2), matShell);
+lidMesh.position.set(0, 0.09, 1.0);
+lidMesh.castShadow = true;
+lidPivot.add(lidMesh);
+
+// lid inner face (darker)
+const lidInner = new THREE.Mesh(new THREE.BoxGeometry(3.0,0.02,1.85), matFoam);
+lidInner.position.set(0,-0.09,1.0); // bottom face of lid
+lidPivot.add(lidInner);
+
+// Rotate lid open
+lidPivot.rotation.x = -Math.PI * 0.55;
+
+// ---- SOLAR PANEL on lid top ----
+const solarGroup = new THREE.Group();
+solarGroup.position.set(0,0.1,1.0);
+lidPivot.add(solarGroup);
+
+const solarBg = new THREE.Mesh(new THREE.BoxGeometry(2.8,0.04,1.75), matSolar);
+solarGroup.add(solarBg);
+
+// Solar cell grid lines
+for(let i=-5;i<=5;i++) {
+  const ln = new THREE.Mesh(new THREE.BoxGeometry(0.01,0.05,1.75), matSolarLine);
+  ln.position.x = i*0.25;
+  solarGroup.add(ln);
+}
+for(let j=-4;j<=4;j++) {
+  const ln = new THREE.Mesh(new THREE.BoxGeometry(2.8,0.05,0.01), matSolarLine);
+  ln.position.z = j*0.19;
+  solarGroup.add(ln);
+}
+
+// ---- TOUCHSCREEN on lid inner face ----
+const screenGroup = new THREE.Group();
+screenGroup.position.set(0,-0.1,1.0);
+lidPivot.add(screenGroup);
+
+// Screen bezel
+const bezel = new THREE.Mesh(new THREE.BoxGeometry(2.5,0.03,1.55), matRubber);
+screenGroup.add(bezel);
+// Screen display
+const screenDisp = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.035,1.4), matScreen);
+screenDisp.position.y=0.01;
+screenGroup.add(screenDisp);
+
+// Screen UI icons (cyan rectangles)
+const iconPositions = [[-0.7,0],[0,0],[0.7,0]];
+iconPositions.forEach(([x,z]) => {
+  const icon = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.04,0.4), matCyan);
+  icon.position.set(x,0.025,z);
+  screenGroup.add(icon);
+});
+
+// Screen status line
+const statusLine = new THREE.Mesh(new THREE.BoxGeometry(2.1,0.03,0.06), matCyan);
+statusLine.position.set(0,0.025,-0.6);
+screenGroup.add(statusLine);
+
+// ---- LABEL on lid ----
+// SAMD-HS text represented as raised geometry strip
+const labelPlate = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.02,0.16), matMetal);
+labelPlate.position.set(0,-0.1,0.25);
+lidPivot.add(labelPlate);
+const labelGlow = new THREE.Mesh(new THREE.BoxGeometry(0.88,0.025,0.06), matCyan);
+labelGlow.position.set(0,-0.09,0.25);
+lidPivot.add(labelGlow);
+
+// ---- HINGE (rear) ----
+for(let x of [-0.8,0,0.8]) {
+  const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.18,16), matMetal);
+  hinge.rotation.z=Math.PI/2; hinge.position.set(x,0,-1.0);
+  suitcase.add(hinge);
+}
+
+// ---- LATCHES (front) ----
+for(let x of [-1.0,1.0]) {
+  const latch = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.12,0.08), matMetal);
+  latch.position.set(x, 0.52, 1.02);
+  suitcase.add(latch);
+  const latchBtn = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.06,0.1), matCyan);
+  latchBtn.position.set(x, 0.52, 1.07);
+  suitcase.add(latchBtn);
+}
+
+// ---- CARRY HANDLE (top, middle of lid) ----
+const handleGroup = new THREE.Group();
+handleGroup.position.set(0, 0.32, 0.5);
+lidPivot.add(handleGroup);
+
+const handleBar = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.05,0.05), matHandle);
+handleGroup.add(handleBar);
+const handleL = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.12,0.05), matHandle);
+handleL.position.set(-0.42,-0.06,0); handleGroup.add(handleL);
+const handleR = handleL.clone(); handleR.position.x=0.42; handleGroup.add(handleR);
+
+// ---- INSIDE BASE: CARTRIDGE MODULES ----
+// 6 cartridge slots in a 3x2 grid
+const cartSlots = new THREE.Group();
+cartSlots.position.set(-0.5, 0.55, -0.3);
+suitcase.add(cartSlots);
+
+const cartridgeNames = ['CBC','CHEM','CARD','INF','COAG','PCR'];
+for(let i=0;i<6;i++) {
+  const col = i%3, row = Math.floor(i/3);
+  const slotX = col*0.55 - 0.55;
+  const slotZ = row*0.6  - 0.3;
+
+  // Slot bay
+  const slotBay = new THREE.Mesh(new THREE.BoxGeometry(0.48,0.02,0.52), matFoam);
+  slotBay.position.set(slotX,0,slotZ);
+  cartSlots.add(slotBay);
+
+  // Cartridge body
+  const cart = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.32,0.46), cartMats[i]);
+  cart.position.set(slotX,0.17,slotZ);
+  cart.castShadow=true;
+  cartSlots.add(cart);
+
+  // Cartridge label strip
+  const labelStrip = new THREE.Mesh(new THREE.BoxGeometry(0.38,0.06,0.04), matScreen);
+  labelStrip.position.set(slotX,0.25,slotZ+0.23);
+  cartSlots.add(labelStrip);
+  // label glow line
+  const labelG = new THREE.Mesh(new THREE.BoxGeometry(0.28,0.02,0.02), new THREE.MeshStandardMaterial({
+    color:cartColors[i], emissive:cartColors[i], emissiveIntensity:2,
+  }));
+  labelG.position.set(slotX,0.25,slotZ+0.255);
+  cartSlots.add(labelG);
+
+  // Port strip on cartridge
+  const portRow = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.03,0.06), matMetal);
+  portRow.position.set(slotX,0.07,slotZ+0.23);
+  cartSlots.add(portRow);
+}
+
+// ---- SAMPLE TUBE RACK (right side) ----
+const tubeRack = new THREE.Group();
+tubeRack.position.set(1.1, 0.55, 0.0);
+suitcase.add(tubeRack);
+
+// Rack frame
+const rackFrame = new THREE.Mesh(new THREE.BoxGeometry(0.75,0.05,1.2), matMetal);
+tubeRack.add(rackFrame);
+
+// 12 tubes in 3x4 grid
+const tubeColors = [0xcc2222,0xcc2222,0x2266cc,0x2266cc,0x22aa44,0x22aa44,
+                    0xcc8800,0xcc8800,0x8822cc,0x8822cc,0xcccccc,0xcccccc];
+for(let i=0;i<12;i++) {
+  const col=i%3, row=Math.floor(i/3);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.05,0.38,12), new THREE.MeshStandardMaterial({
+    color: tubeColors[i], metalness:0.1, roughness:0.3, transparent:true, opacity:0.85,
+  }));
+  tube.position.set(col*0.22-0.22, 0.22, row*0.28-0.42);
+  tubeRack.add(tube);
+  // cap
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.058,0.058,0.04,12), new THREE.MeshStandardMaterial({
+    color:0xdddddd, metalness:0.4, roughness:0.3,
+  }));
+  cap.position.set(col*0.22-0.22, 0.43, row*0.28-0.42);
+  tubeRack.add(cap);
+}
+
+// ---- COOLING / HEPA VENT (right side of base) ----
+const ventGroup = new THREE.Group();
+ventGroup.position.set(1.62, 0.0, 0.0);
+suitcase.add(ventGroup);
+
+// Vent cover
+const ventCover = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.6,0.8), matVent);
+ventGroup.add(ventCover);
+
+// Vent slats
+for(let i=-3;i<=3;i++) {
+  const slat = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.02,0.72), matRubber);
+  slat.position.set(0,i*0.08,0);
+  ventGroup.add(slat);
+}
+
+// Fan grille center
+const fanRing = new THREE.Mesh(new THREE.TorusGeometry(0.12,0.015,8,20), matMetal);
+fanRing.rotation.y=Math.PI/2; fanRing.position.x=0.025;
+ventGroup.add(fanRing);
+const fanInner = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.04,12), matCyan);
+fanInner.rotation.z=Math.PI/2;
+ventGroup.add(fanInner);
+
+// ---- LEFT SIDE VENT ----
+const ventL = ventGroup.clone();
+ventL.position.x = -1.62;
+ventL.scale.x = -1;
+suitcase.add(ventL);
+
+// ---- UV-C DISINFECTION MODULE ----
+const uvcGroup = new THREE.Group();
+uvcGroup.position.set(0, 0.55, 0.65);
+suitcase.add(uvcGroup);
+
+const uvcBox = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.12,0.22), matShell);
+uvcGroup.add(uvcBox);
+// UV-C strips
+for(let x of [-0.15,0,0.15]) {
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.06,0.18), matUVC);
+  strip.position.x=x;
+  uvcGroup.add(strip);
+}
+// UV label strip
+const uvcLabel = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.02,0.04), new THREE.MeshStandardMaterial({
+  color:0x8800ff, emissive:0x5500cc, emissiveIntensity:2,
+}));
+uvcLabel.position.set(0,0.07,0.11);
+uvcGroup.add(uvcLabel);
+
+// ---- BATTERY / PORTS (front panel) ----
+const portGroup = new THREE.Group();
+portGroup.position.set(0, -0.1, 1.03);
+suitcase.add(portGroup);
+
+// Port panel
+const portPanel = new THREE.Mesh(new THREE.BoxGeometry(1.8,0.3,0.04), matShell);
+portGroup.add(portPanel);
+
+// USB ports
+for(let x of [-0.65,-0.45]) {
+  const usb = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.05,0.05), matPort);
+  usb.position.set(x,0,0.025);
+  portGroup.add(usb);
+}
+// HDMI port
+const hdmi = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.06,0.05), matPort);
+hdmi.position.set(-0.2,0,0.025);
+portGroup.add(hdmi);
+
+// Charging port
+const chargePort = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.05,16), matPort);
+chargePort.rotation.x=Math.PI/2; chargePort.position.set(0.1,0,0.025);
+portGroup.add(chargePort);
+
+// Battery indicator LEDs
+for(let i=0;i<5;i++) {
+  const led = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.04,0.02), new THREE.MeshStandardMaterial({
+    color:i<4?0x00ff44:0xff4400, emissive:i<4?0x00ff44:0xff4400, emissiveIntensity:1.5,
+  }));
+  led.position.set(0.4+i*0.07,0,0.025);
+  portGroup.add(led);
+}
+
+// Power button
+const pwrBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.03,16), matCyan);
+pwrBtn.rotation.x=Math.PI/2; pwrBtn.position.set(0.72,0,0.025);
+portGroup.add(pwrBtn);
+
+// ---- CONTROL PANEL (front, inside base) ----
+const ctrlPanel = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.06,0.4), matScreen);
+ctrlPanel.position.set(-1.0,0.53,0.6);
+suitcase.add(ctrlPanel);
+// Control buttons
+for(let i=0;i<4;i++) {
+  const cb = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.07,0.08), matCyan);
+  cb.position.set(-1.2+i*0.15, 0.57, 0.6);
+  suitcase.add(cb);
+}
+
+// ---- ANTENNA (small stub on top-rear of base) ----
+const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.02,0.3,8), matMetal);
+antenna.position.set(1.3,0.65,-0.85);
+suitcase.add(antenna);
+const antennaTip = new THREE.Mesh(new THREE.SphereGeometry(0.025,8,8), matCyan);
+antennaTip.position.set(1.3,0.82,-0.85);
+suitcase.add(antennaTip);
+
+// ---- GROUND SHADOW PLANE ----
+const shadow = new THREE.Mesh(
+  new THREE.PlaneGeometry(10,10),
+  new THREE.MeshStandardMaterial({color:0x020b18, roughness:1, metalness:0})
+);
+shadow.rotation.x=-Math.PI/2; shadow.position.y=-0.55;
+shadow.receiveShadow=true;
+scene.add(shadow);
+
+// ---- GROUND REFLECTION RING (glow) ----
+const glowRing = new THREE.Mesh(
+  new THREE.RingGeometry(1.4,2.0,64),
+  new THREE.MeshBasicMaterial({color:0x00e5ff, transparent:true, opacity:0.04, side:THREE.DoubleSide})
+);
+glowRing.rotation.x=-Math.PI/2; glowRing.position.y=-0.54;
+scene.add(glowRing);
+
+// ---- PARTICLES (ambient floating particles) ----
+const ptCount=180;
+const ptGeo=new THREE.BufferGeometry();
+const ptPos=new Float32Array(ptCount*3);
+for(let i=0;i<ptCount*3;i+=3) {
+  ptPos[i]  =(Math.random()-0.5)*12;
+  ptPos[i+1]=(Math.random()-0.5)*8;
+  ptPos[i+2]=(Math.random()-0.5)*12;
+}
+ptGeo.setAttribute('position',new THREE.BufferAttribute(ptPos,3));
+const ptMat=new THREE.PointsMaterial({color:0x00e5ff, size:0.025, transparent:true, opacity:0.5});
+const particles=new THREE.Points(ptGeo,ptMat);
+scene.add(particles);
+
+/* ============================================================
+   POLY COUNT
+   ============================================================ */
+let polyCount=0;
+scene.traverse(obj=>{if(obj.isMesh && obj.geometry)
+  polyCount+=(obj.geometry.index?.count||obj.geometry.attributes.position.count)/3;
+});
+document.getElementById('poly-count').textContent = Math.round(polyCount).toLocaleString()+' tris';
+
+/* ============================================================
+   EXPLODE STATE
+   ============================================================ */
+let exploded=false;
+const explodeTargets=[
+  {mesh:lidPivot,   homePos:lidPivot.position.clone(),   homeRot:lidPivot.rotation.clone(),   explodePos:new THREE.Vector3(0,1.4,-1.0)},
+  {mesh:cartSlots,  homePos:cartSlots.position.clone(),   homeRot:null, explodePos:new THREE.Vector3(-0.5,2.0,-0.3)},
+  {mesh:tubeRack,   homePos:tubeRack.position.clone(),    homeRot:null, explodePos:new THREE.Vector3(2.2,1.8,0.0)},
+  {mesh:uvcGroup,   homePos:uvcGroup.position.clone(),    homeRot:null, explodePos:new THREE.Vector3(0,2.0,1.5)},
+  {mesh:portGroup,  homePos:portGroup.position.clone(),   homeRot:null, explodePos:new THREE.Vector3(0,-0.1,2.5)},
+  {mesh:ventGroup,  homePos:ventGroup.position.clone(),   homeRot:null, explodePos:new THREE.Vector3(2.8,0.0,0.0)},
+];
+
+function toggleExplode(){
+  exploded=!exploded;
+  document.getElementById('btn-explode').classList.toggle('active', exploded);
+}
+
+/* ============================================================
+   AUTO ROTATE
+   ============================================================ */
+let autoRotate=true;
+function toggleRotate(){
+  autoRotate=!autoRotate;
+  document.getElementById('btn-rotate').classList.toggle('active',autoRotate);
+}
+function resetView(){
+  controls._sph.setFromVector3(new THREE.Vector3(3.8,2.8,4.2));
+  controls._sph.radius=Math.sqrt(3.8*3.8+2.8*2.8+4.2*4.2);
+  controls.target.set(0,0.3,0);
+  exploded=false;
+  document.getElementById('btn-explode').classList.remove('active');
+}
+
+/* ============================================================
+   LABELS
+   ============================================================ */
+let labelsOn=true;
+function toggleLabels(){
+  labelsOn=!labelsOn;
+  document.getElementById('btn-labels').classList.toggle('active',labelsOn);
+  ['lbl-solar','lbl-screen','lbl-cart','lbl-tubes','lbl-hepa','lbl-battery'].forEach(id=>{
+    document.getElementById(id).classList.toggle('visible',labelsOn);
+  });
+}
+// Show labels after load
+setTimeout(()=>toggleLabels(),500);
+
+/* ============================================================
+   ANIMATION LOOP
+   ============================================================ */
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t=clock.getElapsedTime();
+
+  // Auto rotate
+  if(autoRotate) suitcase.rotation.y=t*0.18;
+
+  // Explode lerp
+  const speed=0.06;
+  explodeTargets.forEach(et=>{
+    const target = exploded ? et.explodePos : et.homePos;
+    et.mesh.position.lerp(target, speed);
+  });
+
+  // Lid stays open (keep rotation even after explode)
+  lidPivot.rotation.x = THREE.MathUtils.lerp(lidPivot.rotation.x, -Math.PI*0.55, 0.05);
+
+  // Pulse glow lights
+  glow1.intensity = 1.0+0.4*Math.sin(t*2.3);
+  glow2.intensity = 0.6+0.3*Math.sin(t*1.7+1);
+
+  // Cartridge emissive pulse
+  cartMats.forEach((m,i)=>{ m.emissiveIntensity=0.3+0.3*Math.sin(t*1.5+i*1.1); });
+
+  // Particle drift
+  particles.rotation.y = t*0.02;
+  particles.rotation.x = t*0.008;
+
+  controls.update();
+
+  // Camera info
+  const d=camera.position.distanceTo(controls.target);
+  document.getElementById('cam-info').textContent=`r=${d.toFixed(2)} θ=${(controls._sph.theta*180/Math.PI%360|0)}°`;
+
+  renderer.render(scene,camera);
+}
+animate();
+
+/* ============================================================
+   CLOCK
+   ============================================================ */
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=
+    n.toLocaleTimeString('en-US',{hour12:false});
+}
+tick(); setInterval(tick,1000);
+
+/* ============================================================
+   LOADING SCREEN DISMISS
+   ============================================================ */
+let pct=0;
+const pctEl=document.getElementById('loader-pct');
+const loaderInt=setInterval(()=>{
+  pct+=3;
+  pctEl.textContent=Math.min(pct,100)+'%';
+  if(pct>=100){
+    clearInterval(loaderInt);
+    setTimeout(()=>document.getElementById('loader').classList.add('hide'),200);
+  }
+},40);
+</script>
+
+</body>
+</html>
